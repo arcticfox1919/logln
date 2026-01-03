@@ -1,0 +1,140 @@
+# ============================================================================
+# Build directories
+# ============================================================================
+build/
+out/
+cmake-build-*/
+.build/
+
+# ============================================================================
+# IDE and editor files
+# ============================================================================
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vcxproj.user
+*.aps
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# CLion / JetBrains
+.idea/
+cmake-build-*/
+
+# Qt Creator
+*.autosave
+CMakeLists.txt.user*
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+
+# ============================================================================
+# Compiled files
+# ============================================================================
+# Object files
+*.o
+*.obj
+*.ko
+*.elf
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# ============================================================================
+# CMake generated files
+# ============================================================================
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+CMakeUserPresets.json
+
+# ============================================================================
+# Package managers
+# ============================================================================
+vcpkg_installed/
+conan/
+conanbuildinfo.*
+conaninfo.txt
+graph_info.json
+
+# ============================================================================
+# Testing
+# ============================================================================
+Testing/
+CTestCostData.txt
+DartConfiguration.tcl
+
+# ============================================================================
+# OS generated files
+# ============================================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.fuse_hidden*
+.Trash-*
+
+# ============================================================================
+# Logs and temporary files
+# ============================================================================
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*.orig
+
+# ============================================================================
+# Documentation generated files
+# ============================================================================
+docs/html/
+docs/latex/
+docs/xml/
+Doxyfile.bak
