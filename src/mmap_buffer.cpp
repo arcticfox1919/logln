@@ -123,7 +123,7 @@ void MmapBuffer::flush(AutoBuffer& out) {
     
     // Copy data from mmap to AutoBuffer
     // Note: we do NOT clear here - caller should call clear() after
-    // successfully writing to file (xlog pattern for crash safety)
+    // successfully writing to file (crash safety)
     out.write(view_.data(), view_.size());
 }
 

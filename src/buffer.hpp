@@ -149,84 +149,59 @@ private:
 // ============================================================================
 // AutoBuffer - Self-managed dynamic buffer 
 // OWNS memory, can grow automatically.
+// Implemented as a thin wrapper over std::vector<std::byte>
 // ============================================================================
 
 class AutoBuffer {
 public:
-    static constexpr std::size_t kDefaultUnitSize = 128;
-    
     // Default constructor
     AutoBuffer() noexcept = default;
     
-    // Construct with initial capacity
-    explicit AutoBuffer(std::size_t capacity, std::size_t unit_size = kDefaultUnitSize)
-        : unit_size_(unit_size) {
-        if (capacity > 0) {
-            fit_size(capacity);
-        }
+    // Construct with initial capacity (pre-allocates memory, size remains 0)
+    explicit AutoBuffer(std::size_t capacity) {
+        buffer_.reserve(capacity);
     }
     
-    // Destructor - frees memory
-    ~AutoBuffer() {
-        if (ptr_) {
-            std::free(ptr_);
-        }
-    }
+    // Destructor - vector handles memory automatically
+    ~AutoBuffer() = default;
     
-    // Move semantics
-    AutoBuffer(AutoBuffer&& other) noexcept
-        : ptr_(other.ptr_)
-        , pos_(other.pos_)
-        , length_(other.length_)
-        , capacity_(other.capacity_)
-        , unit_size_(other.unit_size_) {
-        other.ptr_ = nullptr;
-        other.pos_ = 0;
-        other.length_ = 0;
-        other.capacity_ = 0;
-    }
-    
-    AutoBuffer& operator=(AutoBuffer&& other) noexcept {
-        if (this != &other) {
-            if (ptr_) std::free(ptr_);
-            ptr_ = other.ptr_;
-            pos_ = other.pos_;
-            length_ = other.length_;
-            capacity_ = other.capacity_;
-            unit_size_ = other.unit_size_;
-            other.ptr_ = nullptr;
-            other.pos_ = 0;
-            other.length_ = 0;
-            other.capacity_ = 0;
-        }
-        return *this;
-    }
+    // Move semantics - vector handles these automatically
+    AutoBuffer(AutoBuffer&&) noexcept = default;
+    AutoBuffer& operator=(AutoBuffer&&) noexcept = default;
     
     // Non-copyable
     AutoBuffer(const AutoBuffer&) = delete;
     AutoBuffer& operator=(const AutoBuffer&) = delete;
     
-    // Write data (auto-expands if needed)
+    // Write data at current position (auto-expands if needed)
     void write(const void* data, std::size_t len) {
         if (!data || len == 0) return;
         
-        std::size_t new_len = pos_ + len;
-        fit_size(new_len);
+        std::size_t new_end = pos_ + len;
+        if (new_end > buffer_.capacity()) {
+            buffer_.reserve(new_end * 2);  // 2x growth strategy
+        }
+        if (new_end > buffer_.size()) {
+            buffer_.resize(new_end);
+        }
         
-        std::memcpy(ptr_ + pos_, data, len);
-        pos_ += len;
-        length_ = std::max(length_, pos_);
+        std::memcpy(buffer_.data() + pos_, data, len);
+        pos_ = new_end;
     }
     
     // Write at specific position
     void write(std::size_t pos, const void* data, std::size_t len) {
         if (!data || len == 0) return;
         
-        std::size_t new_len = pos + len;
-        fit_size(new_len);
+        std::size_t new_end = pos + len;
+        if (new_end > buffer_.capacity()) {
+            buffer_.reserve(new_end * 2);
+        }
+        if (new_end > buffer_.size()) {
+            buffer_.resize(new_end);
+        }
         
-        std::memcpy(ptr_ + pos, data, len);
-        length_ = std::max(length_, new_len);
+        std::memcpy(buffer_.data() + pos, data, len);
     }
     
     // Write span
@@ -234,84 +209,56 @@ public:
         write(data.data(), data.size());
     }
     
-    // Reset (keeps capacity)
+    // Reset position and size (keeps capacity)
     void reset() noexcept {
         pos_ = 0;
-        length_ = 0;
+        buffer_.clear();  // size=0 but capacity preserved
     }
     
     // Clear and free memory
     void clear() noexcept {
-        if (ptr_) {
-            std::free(ptr_);
-            ptr_ = nullptr;
-        }
         pos_ = 0;
-        length_ = 0;
-        capacity_ = 0;
+        buffer_.clear();
+        buffer_.shrink_to_fit();
     }
     
-    // Attach external buffer (takes ownership!)
-    void attach(void* ptr, std::size_t length, std::size_t capacity) noexcept {
-        if (ptr_) std::free(ptr_);
-        ptr_ = static_cast<std::byte*>(ptr);
-        pos_ = length;
-        length_ = length;
-        capacity_ = capacity;
-    }
-    
-    // Detach and return buffer (caller takes ownership)
-    [[nodiscard]] std::byte* detach(std::size_t& out_length, std::size_t& out_capacity) noexcept {
-        std::byte* result = ptr_;
-        out_length = length_;
-        out_capacity = capacity_;
-        ptr_ = nullptr;
-        pos_ = 0;
-        length_ = 0;
-        capacity_ = 0;
-        return result;
+    // Reserve capacity without changing size
+    void reserve(std::size_t capacity) {
+        buffer_.reserve(capacity);
     }
     
     // Accessors
-    [[nodiscard]] std::byte* ptr() noexcept { return ptr_; }
-    [[nodiscard]] const std::byte* ptr() const noexcept { return ptr_; }
-    [[nodiscard]] std::byte* pos_ptr() noexcept { return ptr_ ? ptr_ + pos_ : nullptr; }
-    [[nodiscard]] const std::byte* pos_ptr() const noexcept { return ptr_ ? ptr_ + pos_ : nullptr; }
+    [[nodiscard]] std::byte* ptr() noexcept { return buffer_.data(); }
+    [[nodiscard]] const std::byte* ptr() const noexcept { return buffer_.data(); }
+    [[nodiscard]] std::byte* pos_ptr() noexcept { 
+        return buffer_.empty() ? nullptr : buffer_.data() + pos_; 
+    }
+    [[nodiscard]] const std::byte* pos_ptr() const noexcept { 
+        return buffer_.empty() ? nullptr : buffer_.data() + pos_; 
+    }
     
     [[nodiscard]] std::size_t pos() const noexcept { return pos_; }
-    void seek(std::size_t pos) noexcept { pos_ = std::min(pos, capacity_); }
+    void seek(std::size_t pos) noexcept { pos_ = std::min(pos, buffer_.size()); }
     
-    [[nodiscard]] std::size_t length() const noexcept { return length_; }
-    [[nodiscard]] std::size_t capacity() const noexcept { return capacity_; }
+    [[nodiscard]] std::size_t length() const noexcept { return buffer_.size(); }
+    [[nodiscard]] std::size_t capacity() const noexcept { return buffer_.capacity(); }
     [[nodiscard]] std::size_t available() const noexcept { 
-        return capacity_ > pos_ ? capacity_ - pos_ : 0; 
+        return buffer_.capacity() > pos_ ? buffer_.capacity() - pos_ : 0; 
     }
-    [[nodiscard]] bool empty() const noexcept { return length_ == 0; }
+    [[nodiscard]] bool empty() const noexcept { return buffer_.empty(); }
     
     // Get data as span
     [[nodiscard]] std::span<const std::byte> data() const noexcept {
-        return {ptr_, length_};
+        return {buffer_.data(), buffer_.size()};
     }
+    
+    // Direct access to underlying vector (for advanced use)
+    [[nodiscard]] std::vector<std::byte>& underlying() noexcept { return buffer_; }
+    [[nodiscard]] const std::vector<std::byte>& underlying() const noexcept { return buffer_; }
     
 private:
-    void fit_size(std::size_t required) {
-        if (required <= capacity_) return;
-        
-        // Grow by unit_size_ multiples
-        std::size_t new_capacity = ((required / unit_size_) + 1) * unit_size_;
-        std::byte* new_ptr = static_cast<std::byte*>(std::realloc(ptr_, new_capacity));
-        
-        if (new_ptr) {
-            ptr_ = new_ptr;
-            capacity_ = new_capacity;
-        }
-    }
-    
-    std::byte* ptr_ = nullptr;
+    std::vector<std::byte> buffer_;
     std::size_t pos_ = 0;
-    std::size_t length_ = 0;
-    std::size_t capacity_ = 0;
-    std::size_t unit_size_ = kDefaultUnitSize;
 };
 
 // ============================================================================
@@ -384,7 +331,6 @@ private:
     BufferView view_;             // Wraps mmap data area (after header)
     
     // Simple header: just store current size (8 bytes)
-    // This is minimal - xlog uses LogCrypt for more complex headers
     static constexpr std::size_t kHeaderSize = 8;
     
     std::uint64_t* size_ptr() noexcept;
