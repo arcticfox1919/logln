@@ -65,6 +65,22 @@ target_include_directories(micro_ecc_lib PUBLIC
 # Use secp256k1 curve
 target_compile_definitions(micro_ecc_lib PRIVATE uECC_CURVE=uECC_secp256k1)
 
+# Monocypher for ChaCha20 symmetric encryption
+FetchContent_Declare(
+    monocypher
+    GIT_REPOSITORY https://github.com/LoupVaillant/Monocypher.git
+    GIT_TAG        4.0.2
+)
+FetchContent_MakeAvailable(monocypher)
+
+# Monocypher is header + source, create a static library
+add_library(monocypher_lib STATIC
+    ${monocypher_SOURCE_DIR}/src/monocypher.c
+)
+target_include_directories(monocypher_lib PUBLIC
+    ${monocypher_SOURCE_DIR}/src
+)
+
 # ============================================================================
 # Main Library (logln)
 # ============================================================================

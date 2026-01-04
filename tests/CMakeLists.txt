@@ -31,3 +31,38 @@ target_include_directories(buffer_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_features(buffer_test PRIVATE cxx_std_23)
 
 gtest_discover_tests(buffer_test)
+
+# ============================================================================
+# Encryptor Tests
+# ============================================================================
+add_executable(encryptor_test 
+    encryptor_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/chacha20_encryptor.cpp
+)
+target_link_libraries(encryptor_test
+    PRIVATE
+        GTest::gtest_main
+        micro_ecc_lib
+        monocypher_lib
+)
+target_include_directories(encryptor_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(encryptor_test PRIVATE cxx_std_23)
+
+gtest_discover_tests(encryptor_test)
+
+# ============================================================================
+# Compressor Tests
+# ============================================================================
+add_executable(compressor_test 
+    compressor_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/zstd_compressor.cpp
+)
+target_link_libraries(compressor_test
+    PRIVATE
+        GTest::gtest_main
+        libzstd_static
+)
+target_include_directories(compressor_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_features(compressor_test PRIVATE cxx_std_23)
+
+gtest_discover_tests(compressor_test)
