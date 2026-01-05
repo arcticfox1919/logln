@@ -66,3 +66,50 @@ target_include_directories(compressor_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_features(compressor_test PRIVATE cxx_std_23)
 
 gtest_discover_tests(compressor_test)
+
+# ============================================================================
+# Formatter Tests
+# ============================================================================
+add_executable(formatter_test 
+    formatter_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/formatter.cpp
+    ${CMAKE_SOURCE_DIR}/src/platform.cpp
+)
+target_link_libraries(formatter_test
+    PRIVATE
+        GTest::gtest_main
+)
+target_include_directories(formatter_test PRIVATE 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_compile_features(formatter_test PRIVATE cxx_std_23)
+
+gtest_discover_tests(formatter_test)
+
+# ============================================================================
+# LogBuffer Tests
+# ============================================================================
+add_executable(log_buffer_test 
+    log_buffer_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/log_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/mmap_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/zstd_compressor.cpp
+    ${CMAKE_SOURCE_DIR}/src/chacha20_encryptor.cpp
+    ${CMAKE_SOURCE_DIR}/src/platform.cpp
+)
+target_link_libraries(log_buffer_test
+    PRIVATE
+        GTest::gtest_main
+        mio::mio
+        libzstd_static
+        monocypher_lib
+        micro_ecc_lib
+)
+target_include_directories(log_buffer_test PRIVATE 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_compile_features(log_buffer_test PRIVATE cxx_std_23)
+
+gtest_discover_tests(log_buffer_test)
