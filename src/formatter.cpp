@@ -3,6 +3,7 @@
 
 #include "logln/formatter.hpp"
 #include "logln/platform.hpp"
+#include "utils.hpp"
 
 #include <array>
 #include <charconv>

@@ -2,6 +2,7 @@
 // Copyright (c) 2024 Logln Contributors
 
 #include "sink.hpp"
+#include "utils.hpp"
 #include "logln/platform.hpp"
 
 #include <format>
@@ -110,7 +111,7 @@ struct FileSink::Impl {
         return false;
     }
     
-    std::string make_filename(const timeval& tv, int index = 0) const {
+    std::string make_filename(const Timestamp& tv, int index = 0) const {
         // Format: prefix_YYYYMMDD_HHMMSS_mmm.log/blog
         auto datetime_str = format_datetime_compact(tv);
         const char* ext = binary_mode ? ".blog" : ".log";

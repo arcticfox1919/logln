@@ -361,12 +361,4 @@ namespace logln {
 [[nodiscard]] Timestamp get_timestamp() noexcept;
 [[nodiscard]] std::uint64_t get_tick_count() noexcept;
 
-// Time formatting
-[[nodiscard]] std::string format_time_full(const Timestamp& tv);
-[[nodiscard]] std::string format_date_compact(const Timestamp& tv);  // YYYYMMDD
-[[nodiscard]] std::string format_datetime_compact(const Timestamp& tv);  // YYYYMMDD_HHMMSS_mmm
-[[nodiscard]] std::string format_timestamp_micros(const Timestamp& tv);  // YYYY-MM-DD HH:MM:SS.uuuuuu
-[[nodiscard]] std::string format_timestamp(const Timestamp& tv);     // YYYY-MM-DD TZ HH:MM:SS.mmm
-[[nodiscard]] std::string format_date(const Timestamp& tv);          // YYYY-MM-DD
-
 } // namespace logln

@@ -74,6 +74,7 @@ add_executable(formatter_test
     formatter_test.cpp
     ${CMAKE_SOURCE_DIR}/src/formatter.cpp
     ${CMAKE_SOURCE_DIR}/src/platform.cpp
+    ${CMAKE_SOURCE_DIR}/src/utils.cpp
 )
 target_link_libraries(formatter_test
     PRIVATE
@@ -97,6 +98,7 @@ add_executable(log_buffer_test
     ${CMAKE_SOURCE_DIR}/src/zstd_compressor.cpp
     ${CMAKE_SOURCE_DIR}/src/chacha20_encryptor.cpp
     ${CMAKE_SOURCE_DIR}/src/platform.cpp
+    ${CMAKE_SOURCE_DIR}/src/utils.cpp
 )
 target_link_libraries(log_buffer_test
     PRIVATE
@@ -113,3 +115,72 @@ target_include_directories(log_buffer_test PRIVATE
 target_compile_features(log_buffer_test PRIVATE cxx_std_23)
 
 gtest_discover_tests(log_buffer_test)
+# ============================================================================
+# Logger Tests
+# ============================================================================
+add_executable(logger_test 
+    logger_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/logger.cpp
+    ${CMAKE_SOURCE_DIR}/src/appender.cpp
+    ${CMAKE_SOURCE_DIR}/src/async_worker.cpp
+    ${CMAKE_SOURCE_DIR}/src/file_sink.cpp
+    ${CMAKE_SOURCE_DIR}/src/console_sink.cpp
+    ${CMAKE_SOURCE_DIR}/src/formatter.cpp
+    ${CMAKE_SOURCE_DIR}/src/log_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/mmap_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/zstd_compressor.cpp
+    ${CMAKE_SOURCE_DIR}/src/chacha20_encryptor.cpp
+    ${CMAKE_SOURCE_DIR}/src/platform.cpp
+    ${CMAKE_SOURCE_DIR}/src/utils.cpp
+)
+target_link_libraries(logger_test
+    PRIVATE
+        GTest::gtest_main
+        mio::mio
+        libzstd_static
+        monocypher_lib
+        micro_ecc_lib
+)
+target_include_directories(logger_test PRIVATE 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+    ${concurrentqueue_SOURCE_DIR}
+)
+target_compile_features(logger_test PRIVATE cxx_std_23)
+
+gtest_discover_tests(logger_test)
+
+# ============================================================================
+# Benchmark Tests
+# ============================================================================
+add_executable(benchmark_test 
+    benchmark_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/logger.cpp
+    ${CMAKE_SOURCE_DIR}/src/appender.cpp
+    ${CMAKE_SOURCE_DIR}/src/async_worker.cpp
+    ${CMAKE_SOURCE_DIR}/src/file_sink.cpp
+    ${CMAKE_SOURCE_DIR}/src/console_sink.cpp
+    ${CMAKE_SOURCE_DIR}/src/formatter.cpp
+    ${CMAKE_SOURCE_DIR}/src/log_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/mmap_buffer.cpp
+    ${CMAKE_SOURCE_DIR}/src/zstd_compressor.cpp
+    ${CMAKE_SOURCE_DIR}/src/chacha20_encryptor.cpp
+    ${CMAKE_SOURCE_DIR}/src/platform.cpp
+    ${CMAKE_SOURCE_DIR}/src/utils.cpp
+)
+target_link_libraries(benchmark_test
+    PRIVATE
+        GTest::gtest_main
+        mio::mio
+        libzstd_static
+        monocypher_lib
+        micro_ecc_lib
+)
+target_include_directories(benchmark_test PRIVATE 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+    ${concurrentqueue_SOURCE_DIR}
+)
+target_compile_features(benchmark_test PRIVATE cxx_std_23)
+
+gtest_discover_tests(benchmark_test)

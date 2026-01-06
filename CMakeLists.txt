@@ -81,6 +81,14 @@ target_include_directories(monocypher_lib PUBLIC
     ${monocypher_SOURCE_DIR}/src
 )
 
+# concurrentqueue - High-performance lock-free queue
+FetchContent_Declare(
+    concurrentqueue
+    GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
+    GIT_TAG        v1.0.4
+)
+FetchContent_MakeAvailable(concurrentqueue)
+
 # ============================================================================
 # Main Library (logln)
 # ============================================================================
