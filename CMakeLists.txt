@@ -13,8 +13,45 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ============================================================================
+# Build Optimization
+# ============================================================================
+
+# Enable Link-Time Optimization only for shared library builds
+include(CheckIPOSupported)
+check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_OUTPUT)
+if(IPO_SUPPORTED AND LOGLN_BUILD_SHARED)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+endif()
+
+# Platform-specific Release optimization flags
+if(MSVC)
+    # Release optimization flags
+    # /O2 is already set by CMake for Release, /Ob3 for more aggressive inlining
+    string(REPLACE "/Ob2" "/Ob3" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+    string(REPLACE "/Ob2" "/Ob3" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+else()
+    # -O3 - Maximum optimization
+    # -DNDEBUG - Disable assertions (already set by CMake)
+    # -ffunction-sections -fdata-sections - Enable dead code elimination
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -ffunction-sections -fdata-sections")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -ffunction-sections -fdata-sections")
+    # --gc-sections - Remove unused sections at link time
+    if(APPLE)
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,-dead_strip")
+        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,-dead_strip")
+    else()
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,--gc-sections")
+        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,--gc-sections")
+    endif()
+endif()
+
+# ============================================================================
 # Options
 # ============================================================================
+option(LOGLN_BUILD_SHARED "Build shared library" OFF)
+option(LOGLN_BUILD_TESTS "Build unit tests" ON)
+option(LOGLN_BUILD_EXAMPLES "Build examples" OFF)
 
 
 # ============================================================================
@@ -30,40 +67,28 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(mio)
 
-# zstd - Always needed for decoder library, optional for main library
-# (decoder needs to be able to decode any log file)
-find_package(zstd QUIET)
-if(NOT zstd_FOUND)
-    FetchContent_Declare(
-        zstd
-        GIT_REPOSITORY https://github.com/facebook/zstd.git
-        GIT_TAG        v1.5.7
-        SOURCE_SUBDIR  build/cmake
-    )
-    set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
-    set(ZSTD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(ZSTD_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-    set(ZSTD_BUILD_STATIC ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(zstd)
-endif()
+# zstd - Compression library
+FetchContent_Declare(
+    zstd
+    GIT_REPOSITORY https://github.com/facebook/zstd.git
+    GIT_TAG        v1.5.7
+    SOURCE_SUBDIR  build/cmake
+)
+set(ZSTD_BUILD_PROGRAMS OFF CACHE BOOL "" FORCE)
+set(ZSTD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ZSTD_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(ZSTD_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(ZSTD_MULTITHREAD_SUPPORT OFF CACHE BOOL "" FORCE)
+set(ZSTD_LEGACY_SUPPORT OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(zstd)
 
-# micro-ecc for ECDH - Always needed for decoder library
+# micro-ecc for ECDH
 FetchContent_Declare(
     micro_ecc
     GIT_REPOSITORY https://github.com/kmackay/micro-ecc.git
     GIT_TAG        v1.1
 )
 FetchContent_MakeAvailable(micro_ecc)
-
-# micro-ecc is header + source, create a static library
-add_library(micro_ecc_lib STATIC
-    ${micro_ecc_SOURCE_DIR}/uECC.c
-)
-target_include_directories(micro_ecc_lib PUBLIC
-    ${micro_ecc_SOURCE_DIR}
-)
-# Use secp256k1 curve
-target_compile_definitions(micro_ecc_lib PRIVATE uECC_CURVE=uECC_secp256k1)
 
 # Monocypher for ChaCha20 symmetric encryption
 FetchContent_Declare(
@@ -73,14 +98,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(monocypher)
 
-# Monocypher is header + source, create a static library
-add_library(monocypher_lib STATIC
-    ${monocypher_SOURCE_DIR}/src/monocypher.c
-)
-target_include_directories(monocypher_lib PUBLIC
-    ${monocypher_SOURCE_DIR}/src
-)
-
 # concurrentqueue - High-performance lock-free queue
 FetchContent_Declare(
     concurrentqueue
@@ -89,15 +106,105 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(concurrentqueue)
 
+# Threads
+find_package(Threads REQUIRED)
+
 # ============================================================================
 # Main Library (logln)
 # ============================================================================
 
-# ============================================================================
-# Library
-# ============================================================================
+set(LOGLN_SOURCES
+    src/logger.cpp
+    src/appender.cpp
+    src/async_worker.cpp
+    src/file_sink.cpp
+    src/console_sink.cpp
+    src/formatter.cpp
+    src/log_buffer.cpp
+    src/mmap_buffer.cpp
+    src/zstd_compressor.cpp
+    src/chacha20_encryptor.cpp
+    src/platform.cpp
+    src/utils.cpp
+    src/logln_c.cpp
+)
 
+set(LOGLN_PUBLIC_HEADERS
+    include/logln/logln.h
+    include/logln/logln_c.h
+    include/logln/logger.hpp
+    include/logln/config.hpp
+    include/logln/types.hpp
+    include/logln/formatter.hpp
+    include/logln/platform.hpp
+)
 
+# Choose library type based on option
+if(LOGLN_BUILD_SHARED)
+    # Shared library: embed small dependencies directly to avoid export issues
+    add_library(logln SHARED 
+        ${LOGLN_SOURCES}
+        ${monocypher_SOURCE_DIR}/src/monocypher.c
+        ${micro_ecc_SOURCE_DIR}/uECC.c
+    )
+    target_compile_definitions(logln PRIVATE 
+        LOGLN_BUILDING_DLL
+        uECC_CURVE=uECC_secp256k1
+    )
+    target_compile_definitions(logln INTERFACE LOGLN_USING_DLL)
+    target_include_directories(logln PRIVATE
+        ${monocypher_SOURCE_DIR}/src
+        ${micro_ecc_SOURCE_DIR}
+    )
+    set_target_properties(logln PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+    # Link zstd statically into the shared library
+    target_link_libraries(logln PRIVATE libzstd_static)
+else()
+    # Static library: embed sources directly (same as shared) for simpler export
+    add_library(logln STATIC 
+        ${LOGLN_SOURCES}
+        ${monocypher_SOURCE_DIR}/src/monocypher.c
+        ${micro_ecc_SOURCE_DIR}/uECC.c
+    )
+    target_compile_definitions(logln PRIVATE uECC_CURVE=uECC_secp256k1)
+    target_include_directories(logln PRIVATE
+        ${monocypher_SOURCE_DIR}/src
+        ${micro_ecc_SOURCE_DIR}
+    )
+    target_link_libraries(logln PRIVATE libzstd_static)
+endif()
+
+# Also create an alias for consistent usage
+add_library(logln::logln ALIAS logln)
+
+target_include_directories(logln
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${concurrentqueue_SOURCE_DIR}
+)
+
+target_link_libraries(logln
+    PRIVATE
+        mio::mio
+        Threads::Threads
+)
+
+target_compile_features(logln PUBLIC cxx_std_23)
+
+# Platform-specific settings
+if(WIN32)
+    target_compile_definitions(logln PRIVATE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+    )
+endif()
 
 # Apple platforms (iOS, macOS, watchOS, tvOS)
 if(APPLE)
@@ -117,11 +224,66 @@ if(APPLE)
     )
 endif()
 
+# Android
+if(ANDROID)
+    target_link_libraries(logln PRIVATE log)
+endif()
+
+# ============================================================================
+# Installation
+# ============================================================================
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS logln
+    EXPORT loglnTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY include/logln
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+)
+
+install(EXPORT loglnTargets
+    FILE loglnTargets.cmake
+    NAMESPACE logln::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/logln
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/loglnConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/loglnConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/logln
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/loglnConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/loglnConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/loglnConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/logln
+)
+
+
+# ============================================================================
+# Examples
+# ============================================================================
+
+if(LOGLN_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 
 # ============================================================================
 # Testing
 # ============================================================================
-option(LOGLN_BUILD_TESTS "Build unit tests" ON)
 
 if(LOGLN_BUILD_TESTS)
     enable_testing()
