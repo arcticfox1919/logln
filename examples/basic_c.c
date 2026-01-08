@@ -8,7 +8,7 @@
 // Or link with shared library:
 //   cl /DLOGLN_USING_DLL /I include examples/basic_c.c build/Release/logln.lib
 
-#include <logln/logln_c.h>
+#include <logln/logln.h>
 #include <stdio.h>
 #include <stdlib.h>
 

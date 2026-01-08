@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2024 Logln Contributors
 
-#include "logln/logln_c.h"
+#include "logln/logln.h"
 #include "logln/logger.hpp"
 #include "logln/config.hpp"
 

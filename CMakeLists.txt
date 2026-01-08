@@ -90,6 +90,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(micro_ecc)
 
+# Create micro_ecc library target for tests
+add_library(micro_ecc_lib STATIC ${micro_ecc_SOURCE_DIR}/uECC.c)
+target_include_directories(micro_ecc_lib PUBLIC ${micro_ecc_SOURCE_DIR})
+target_compile_definitions(micro_ecc_lib PUBLIC uECC_CURVE=uECC_secp256k1)
+
 # Monocypher for ChaCha20 symmetric encryption
 FetchContent_Declare(
     monocypher
@@ -97,6 +102,10 @@ FetchContent_Declare(
     GIT_TAG        4.0.2
 )
 FetchContent_MakeAvailable(monocypher)
+
+# Create monocypher library target for tests
+add_library(monocypher_lib STATIC ${monocypher_SOURCE_DIR}/src/monocypher.c)
+target_include_directories(monocypher_lib PUBLIC ${monocypher_SOURCE_DIR}/src)
 
 # concurrentqueue - High-performance lock-free queue
 FetchContent_Declare(
@@ -126,12 +135,11 @@ set(LOGLN_SOURCES
     src/chacha20_encryptor.cpp
     src/platform.cpp
     src/utils.cpp
-    src/logln_c.cpp
+    src/logln.cpp
 )
 
 set(LOGLN_PUBLIC_HEADERS
     include/logln/logln.h
-    include/logln/logln_c.h
     include/logln/logger.hpp
     include/logln/config.hpp
     include/logln/types.hpp
@@ -227,6 +235,86 @@ endif()
 # Android
 if(ANDROID)
     target_link_libraries(logln PRIVATE log)
+endif()
+
+# ============================================================================
+# Decoder Library (standalone shared library for third-party tools)
+# ============================================================================
+option(LOGLN_BUILD_DECODER_LIB "Build standalone decoder library" ON)
+option(LOGLN_BUILD_TOOLS "Build command-line tools" ON)
+
+if(LOGLN_BUILD_DECODER_LIB)
+    # Decoder library sources - minimal set for decoding only
+    set(LOGLN_DECODER_SOURCES
+        src/decoder.cpp
+        src/log_buffer.cpp
+        src/mmap_buffer.cpp
+        src/zstd_compressor.cpp
+        src/chacha20_encryptor.cpp
+        src/utils.cpp
+        ${monocypher_SOURCE_DIR}/src/monocypher.c
+        ${micro_ecc_SOURCE_DIR}/uECC.c
+    )
+    
+    # Build decoder as shared library
+    add_library(logln_decoder SHARED ${LOGLN_DECODER_SOURCES})
+    
+    target_compile_definitions(logln_decoder PRIVATE 
+        LOGLN_DECODER_BUILDING_DLL
+        uECC_CURVE=uECC_secp256k1
+    )
+    target_compile_definitions(logln_decoder INTERFACE LOGLN_DECODER_USING_DLL)
+    
+    target_include_directories(logln_decoder
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:include>
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${monocypher_SOURCE_DIR}/src
+            ${micro_ecc_SOURCE_DIR}
+    )
+    
+    target_link_libraries(logln_decoder PRIVATE 
+        libzstd_static
+        mio::mio
+    )
+    
+    target_compile_features(logln_decoder PUBLIC cxx_std_23)
+    
+    set_target_properties(logln_decoder PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+        OUTPUT_NAME "logln_decoder"
+    )
+    
+    # Platform-specific settings for decoder
+    if(WIN32)
+        target_compile_definitions(logln_decoder PRIVATE
+            WIN32_LEAN_AND_MEAN
+            NOMINMAX
+            _CRT_SECURE_NO_WARNINGS
+        )
+    endif()
+    
+    # Also create alias for consistent usage
+    add_library(logln::decoder ALIAS logln_decoder)
+    
+    # Install decoder library
+    install(TARGETS logln_decoder
+        EXPORT loglnDecoderTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+endif()
+
+# ============================================================================
+# Command-line Tools
+# ============================================================================
+if(LOGLN_BUILD_TOOLS)
+    add_subdirectory(tools)
 endif()
 
 # ============================================================================
