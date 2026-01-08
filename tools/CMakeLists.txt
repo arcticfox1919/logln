@@ -49,3 +49,33 @@ install(TARGETS loglnd
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+# ============================================================================
+# loglnk - Key pair generator for encryption
+# ============================================================================
+
+add_executable(loglnk logln_keygen.cpp)
+
+target_sources(loglnk PRIVATE
+    ${micro_ecc_SOURCE_DIR}/uECC.c
+)
+
+target_compile_definitions(loglnk PRIVATE uECC_CURVE=uECC_secp256k1)
+
+target_include_directories(loglnk PRIVATE
+    ${micro_ecc_SOURCE_DIR}
+)
+
+target_compile_features(loglnk PRIVATE cxx_std_23)
+
+if(WIN32)
+    target_compile_definitions(loglnk PRIVATE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+    )
+endif()
+
+install(TARGETS loglnk
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
