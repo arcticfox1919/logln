@@ -35,6 +35,12 @@ public:
     // Get client public key for header
     [[nodiscard]] virtual std::span<const std::byte> public_key() const = 0;
     
+    // Get nonce (first 16 bytes for header storage)
+    [[nodiscard]] virtual std::span<const std::byte> nonce() const = 0;
+    
+    // Set nonce (for decryption - restore from header)
+    virtual void set_nonce(std::span<const std::byte> nonce) = 0;
+    
     // Check if encryption is active
     [[nodiscard]] virtual bool is_active() const noexcept = 0;
 };
@@ -75,6 +81,10 @@ public:
     decrypt(std::span<const std::byte> input) override;
     
     [[nodiscard]] std::span<const std::byte> public_key() const override;
+    
+    [[nodiscard]] std::span<const std::byte> nonce() const override;
+    
+    void set_nonce(std::span<const std::byte> nonce) override;
     
     [[nodiscard]] bool is_active() const noexcept override;
     

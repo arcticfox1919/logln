@@ -55,6 +55,27 @@ static std::vector<std::byte> read_client_pubkey(const fs::path& path) {
     return pubkey;
 }
 
+// Read nonce from file header (bytes 73-88, 16 bytes)
+static std::vector<std::byte> read_nonce(const fs::path& path) {
+    std::vector<std::byte> nonce(16);
+    FILE* fp = std::fopen(path.string().c_str(), "rb");
+    if (!fp) return {};
+    
+    // Seek to byte 73 (after magic, seq, hours, length, client_pubkey)
+    if (std::fseek(fp, 73, SEEK_SET) != 0) {
+        std::fclose(fp);
+        return {};
+    }
+    
+    if (std::fread(nonce.data(), 1, 16, fp) != 16) {
+        std::fclose(fp);
+        return {};
+    }
+    
+    std::fclose(fp);
+    return nonce;
+}
+
 static LogDecoder::Options make_decoder_opts([[maybe_unused]] const fs::path& input_path) {
     LogDecoder::Options opts{};
     
@@ -70,6 +91,11 @@ static LogDecoder::Options make_decoder_opts([[maybe_unused]] const fs::path& in
         auto client_pubkey = read_client_pubkey(input_path);
         if (!client_pubkey.empty()) {
             g_encryptor = create_decryptor(client_pubkey, g_server_priv_key_hex);
+            // Read and set nonce from header
+            auto nonce = read_nonce(input_path);
+            if (!nonce.empty() && g_encryptor) {
+                g_encryptor->set_nonce(nonce);
+            }
         }
     }
     if (g_encryptor) {

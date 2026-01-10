@@ -32,8 +32,9 @@ Mobile applications have unique logging requirements that traditional logging li
 ## Quick Start
 
 For complete usage examples, see:
-- **C++ API**: [examples/basic_cpp.cpp](examples/basic_cpp.cpp)
-- **C API**: [examples/basic_c.c](examples/basic_c.c)
+- **Basic**: [examples/basic_cpp.cpp](examples/basic_cpp.cpp), [examples/basic_c.c](examples/basic_c.c)
+- **Advanced** (compression, encryption, custom format): [examples/advanced.cpp](examples/advanced.cpp), [examples/advanced_c.c](examples/advanced_c.c)
+- **Log Decoder Script**: [examples/decode_logs.py](examples/decode_logs.py)
 - **Unit Tests**: [tests/](tests/) - comprehensive API coverage
 
 ### C++ API (Minimal)

@@ -164,6 +164,18 @@ std::span<const std::byte> ChaCha20Encryptor::public_key() const {
     return std::as_bytes(std::span{impl_->client_pubkey});
 }
 
+std::span<const std::byte> ChaCha20Encryptor::nonce() const {
+    // Return first 16 bytes of nonce for header storage
+    return std::as_bytes(std::span{impl_->nonce.data(), 16});
+}
+
+void ChaCha20Encryptor::set_nonce(std::span<const std::byte> nonce) {
+    if (nonce.size() >= 16) {
+        std::memcpy(impl_->nonce.data(), nonce.data(), 16);
+        impl_->counter = 0;  // Reset counter when nonce is set
+    }
+}
+
 bool ChaCha20Encryptor::is_active() const noexcept {
     return impl_->active;
 }
@@ -300,15 +312,19 @@ public:
         return {};
     }
     
-    bool is_active() const noexcept override {
-        return active_;
+    std::span<const std::byte> nonce() const override {
+        return std::as_bytes(std::span{nonce_.data(), 16});
     }
     
-    // Set nonce (must match encryptor's nonce for decryption to work)
-    void set_nonce(std::span<const std::uint8_t> nonce) {
+    void set_nonce(std::span<const std::byte> nonce) override {
         if (nonce.size() >= 16) {
             std::memcpy(nonce_.data(), nonce.data(), 16);
+            counter_ = 0;  // Reset counter when nonce is set
         }
+    }
+    
+    bool is_active() const noexcept override {
+        return active_;
     }
     
     // Reset counter for synchronized decryption

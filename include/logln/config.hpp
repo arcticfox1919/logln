@@ -324,6 +324,14 @@ public:
         return *this;
     }
     
+    /// Set log format pattern
+    /// Supported tokens: {level}, {Level}, {time}, {time6}, {date}, {pid}, {tid}, 
+    ///                   {tid*}, {tag}, {file}, {path}, {line}, {func}, {msg}, {n}
+    ConfigBuilder& format(std::string pattern) {
+        config_.format_pattern = std::move(pattern);
+        return *this;
+    }
+    
     /// Build with validation (fast, no I/O)
     [[nodiscard]] std::expected<Config, std::vector<ConfigError>> build() const {
         auto result = config_.validate();

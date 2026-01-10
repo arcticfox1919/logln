@@ -35,12 +35,12 @@ static int rng_function(uint8_t* dest, unsigned size) {
 // ============================================================================
 
 static std::string bytes_to_hex(const uint8_t* data, size_t len) {
+    static const char hex_chars[] = "0123456789abcdef";
     std::string hex;
     hex.reserve(len * 2);
     for (size_t i = 0; i < len; ++i) {
-        char buf[3];
-        std::snprintf(buf, sizeof(buf), "%02x", data[i]);
-        hex += buf;
+        hex += hex_chars[(data[i] >> 4) & 0x0F];
+        hex += hex_chars[data[i] & 0x0F];
     }
     return hex;
 }

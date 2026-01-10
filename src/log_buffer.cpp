@@ -69,6 +69,9 @@ void LogHeader::write_header(std::byte* buffer,
     
     // client_pubkey (64 bytes) - zero fill initially, set later if encrypted
     std::memset(data + 9, 0, 64);
+    
+    // nonce (16 bytes) - zero fill initially, set later if encrypted
+    std::memset(data + 73, 0, 16);
 }
 
 void LogHeader::write_tailer(std::byte* buffer) noexcept {
@@ -86,6 +89,19 @@ void LogHeader::set_client_pubkey(std::byte* header,
 std::span<const std::byte> LogHeader::get_client_pubkey(
     const std::byte* header) noexcept {
     return std::span<const std::byte>(header + kClientPubKeyOffset, kClientPubKeySize);
+}
+
+void LogHeader::set_nonce(std::byte* header,
+                          std::span<const std::byte> nonce) noexcept {
+    if (nonce.size() >= kNonceSize) {
+        std::memcpy(reinterpret_cast<char*>(header) + kNonceOffset,
+                   nonce.data(), kNonceSize);
+    }
+}
+
+std::span<const std::byte> LogHeader::get_nonce(
+    const std::byte* header) noexcept {
+    return std::span<const std::byte>(header + kNonceOffset, kNonceSize);
 }
 
 void LogHeader::add_length(std::byte* header, std::uint32_t add_len) noexcept {
@@ -487,9 +503,10 @@ void LogBuffer::ensure_initialized() {
         has_encryptor()
     );
     
-    // Set client public key if encryption is enabled
+    // Set client public key and nonce if encryption is enabled
     if (encryptor_ && encryptor_->is_active()) {
         LogHeader::set_client_pubkey(view_.data(), encryptor_->public_key());
+        LogHeader::set_nonce(view_.data(), encryptor_->nonce());
     }
     
     view_.set_size(LogHeader::kHeaderSize);

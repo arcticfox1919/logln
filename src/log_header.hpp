@@ -8,10 +8,10 @@
 // - Header/Tailer structure for crash recovery
 //
 // Buffer format:
-// | Header (73 bytes) | Processed Log Data... | Tailer (1 byte) |
+// | Header (89 bytes) | Processed Log Data... | Tailer (1 byte) |
 //
-// Header format (73 bytes):
-// | magic (1) | seq (2) | begin_hour (1) | end_hour (1) | length (4) | client_pubkey (64) |
+// Header format (89 bytes):
+// | magic (1) | seq (2) | begin_hour (1) | end_hour (1) | length (4) | client_pubkey (64) | nonce (16) |
 
 #pragma once
 
@@ -60,21 +60,24 @@ struct LogMagicNum {
 // ============================================================================
 // LogHeader - Buffer header for crash recovery 
 //
-// Header format (73 bytes):
-// | magic (1) | seq (2) | begin_hour (1) | end_hour (1) | length (4) | client_pubkey (64) |
+// Header format (89 bytes):
+// | magic (1) | seq (2) | begin_hour (1) | end_hour (1) | length (4) | client_pubkey (64) | nonce (16) |
 //
 // Tailer format (1 byte):
 // | magic_end (1) |
 //
 // Note: client_pubkey is used for ECDH key exchange when encryption is enabled
+//       nonce is the first 16 bytes of the XChaCha20 nonce (counter in last 8 bytes)
 // ============================================================================
 
 class LogHeader {
 public:
-    static constexpr std::size_t kHeaderSize = 73;  // 9 + 64 (client pubkey)
+    static constexpr std::size_t kHeaderSize = 89;  // 9 + 64 (client pubkey) + 16 (nonce)
     static constexpr std::size_t kTailerSize = 1;
     static constexpr std::size_t kClientPubKeyOffset = 9;  // After magic, seq, hours, length
     static constexpr std::size_t kClientPubKeySize = 64;
+    static constexpr std::size_t kNonceOffset = 73;  // After client pubkey
+    static constexpr std::size_t kNonceSize = 16;
     
     LogHeader() = default;
     
@@ -91,6 +94,14 @@ public:
     
     // Get client public key from header
     [[nodiscard]] static std::span<const std::byte> get_client_pubkey(
+        const std::byte* header) noexcept;
+    
+    // Set encryption nonce in header
+    static void set_nonce(std::byte* header,
+                          std::span<const std::byte> nonce) noexcept;
+    
+    // Get encryption nonce from header
+    [[nodiscard]] static std::span<const std::byte> get_nonce(
         const std::byte* header) noexcept;
     
     // Update data length in header (accumulative)

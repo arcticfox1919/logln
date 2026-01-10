@@ -9,7 +9,7 @@
 // - Modular: compression/encryption are optional injected dependencies
 //
 // The mmap buffer maintains:
-// | Header (73 bytes) | Processed Log Data... | Tailer (1 byte) |
+// | Header (89 bytes) | Processed Log Data... | Tailer (1 byte) |
 //
 // Crash recovery: On startup, check header magic and length to recover data.
 

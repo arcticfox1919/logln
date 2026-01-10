@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Logln C99 Basic Example
 //
-// Build:
-//   cmake --build build --config Release
-//   cl /I include examples/basic_c.c build/Release/logln.lib
-//
-// Or link with shared library:
-//   cl /DLOGLN_USING_DLL /I include examples/basic_c.c build/Release/logln.lib
 
 #include <logln/logln.h>
 #include <stdio.h>

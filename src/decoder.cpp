@@ -60,12 +60,24 @@ LogDecoder::process_data(std::span<const std::byte> data, const Options& opts,
     std::vector<std::byte> result(data.begin(), data.end());
     
     // Decrypt first (reverse order of encoding)
+    // IMPORTANT: Decryption must be done in 8-byte blocks to match the
+    // encryption process in LogBuffer::write(), which encrypts each 8-byte
+    // block with an incrementing counter.
     if (is_encrypted && opts.encryptor) {
-        auto decrypted = opts.encryptor->decrypt(result);
-        if (!decrypted) {
-            return std::unexpected(DecodeError::DecryptFailed);
+        constexpr std::size_t kBlockSize = 8;
+        std::size_t block_count = result.size() / kBlockSize;
+        
+        for (std::size_t i = 0; i < block_count; ++i) {
+            auto block = std::span<std::byte>(result.data() + i * kBlockSize, kBlockSize);
+            auto decrypted = opts.encryptor->decrypt(block);
+            if (!decrypted) {
+                return std::unexpected(DecodeError::DecryptFailed);
+            }
+            std::copy(decrypted->begin(), decrypted->end(), block.begin());
         }
-        result = std::move(*decrypted);
+        
+        // Note: Any trailing bytes (< 8) were not encrypted during write,
+        // so they don't need decryption
     }
     
     // Then decompress

@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Logln C++ Basic Example
 //
-// Build:
-//   cmake --build build --config Release
-//   cl /std:c++23 /I include examples/basic_cpp.cpp build/Release/logln.lib
-//
-// Or link with shared library:
-//   cl /std:c++23 /DLOGLN_USING_DLL /I include examples/basic_cpp.cpp build/Release/logln.lib
 
 #include <logln/logln.h>
 #include <iostream>
