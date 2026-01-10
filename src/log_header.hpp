@@ -7,6 +7,21 @@
 // - Magic numbers for format identification
 // - Header/Tailer structure for crash recovery
 //
+// BLOCK-INDEPENDENT ENCRYPTION DESIGN:
+// ====================================
+// File structure:
+//   [Block1: header+data] [Block2: header+data] ...
+//
+// Each block is encrypted independently:
+// - EVERY block stores its own client_pubkey (64B) + nonce (16B) in header
+// - Encryption counter resets to 0 at the start of each new block
+// - Decoder processes each block independently
+//
+// Why block-independent?
+// - Crash-safe: if process crashes, counter state is lost
+// - Each block can be decoded without prior blocks
+// - 80 bytes overhead per block is acceptable for log data
+//
 // Buffer format:
 // | Header (89 bytes) | Processed Log Data... | Tailer (1 byte) |
 //

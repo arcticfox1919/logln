@@ -187,15 +187,16 @@ struct Appender::Impl {
     void close() {
         if (closed.exchange(true)) return;
         
-        // Shutdown marker (only for plain text mode)
-        if (!needs_binary_mode()) {
-            write_shutdown_marker();
-        }
-        
         async_worker.stop();
         
         // Final flush
         do_flush();
+        
+        // Shutdown marker (only for plain text mode)
+        // Must be written AFTER all logs are flushed
+        if (!needs_binary_mode()) {
+            write_shutdown_marker();
+        }
     }
     
     // ========== Log Thread Callback (writes to mmap buffer) ==========

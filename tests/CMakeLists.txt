@@ -51,6 +51,27 @@ target_compile_features(encryptor_test PRIVATE cxx_std_23)
 gtest_discover_tests(encryptor_test)
 
 # ============================================================================
+# Encryption Integration Tests (Logger + Decoder full pipeline)
+# ============================================================================
+add_executable(encryption_test 
+    encryption_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/decoder.cpp
+)
+target_link_libraries(encryption_test
+    PRIVATE
+        GTest::gtest_main
+        logln
+        mio::mio
+)
+target_include_directories(encryption_test PRIVATE 
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_compile_features(encryption_test PRIVATE cxx_std_23)
+
+gtest_discover_tests(encryption_test)
+
+# ============================================================================
 # Compressor Tests
 # ============================================================================
 add_executable(compressor_test 
@@ -120,31 +141,15 @@ gtest_discover_tests(log_buffer_test)
 # ============================================================================
 add_executable(logger_test 
     logger_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/logger.cpp
-    ${CMAKE_SOURCE_DIR}/src/appender.cpp
-    ${CMAKE_SOURCE_DIR}/src/async_worker.cpp
-    ${CMAKE_SOURCE_DIR}/src/file_sink.cpp
-    ${CMAKE_SOURCE_DIR}/src/console_sink.cpp
-    ${CMAKE_SOURCE_DIR}/src/formatter.cpp
-    ${CMAKE_SOURCE_DIR}/src/log_buffer.cpp
-    ${CMAKE_SOURCE_DIR}/src/mmap_buffer.cpp
-    ${CMAKE_SOURCE_DIR}/src/zstd_compressor.cpp
-    ${CMAKE_SOURCE_DIR}/src/chacha20_encryptor.cpp
-    ${CMAKE_SOURCE_DIR}/src/platform.cpp
-    ${CMAKE_SOURCE_DIR}/src/utils.cpp
 )
 target_link_libraries(logger_test
     PRIVATE
         GTest::gtest_main
-        mio::mio
-        libzstd_static
-        monocypher_lib
-        micro_ecc_lib
+        logln
 )
 target_include_directories(logger_test PRIVATE 
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
-    ${concurrentqueue_SOURCE_DIR}
 )
 target_compile_features(logger_test PRIVATE cxx_std_23)
 
@@ -155,31 +160,15 @@ gtest_discover_tests(logger_test)
 # ============================================================================
 add_executable(benchmark_test 
     benchmark_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/logger.cpp
-    ${CMAKE_SOURCE_DIR}/src/appender.cpp
-    ${CMAKE_SOURCE_DIR}/src/async_worker.cpp
-    ${CMAKE_SOURCE_DIR}/src/file_sink.cpp
-    ${CMAKE_SOURCE_DIR}/src/console_sink.cpp
-    ${CMAKE_SOURCE_DIR}/src/formatter.cpp
-    ${CMAKE_SOURCE_DIR}/src/log_buffer.cpp
-    ${CMAKE_SOURCE_DIR}/src/mmap_buffer.cpp
-    ${CMAKE_SOURCE_DIR}/src/zstd_compressor.cpp
-    ${CMAKE_SOURCE_DIR}/src/chacha20_encryptor.cpp
-    ${CMAKE_SOURCE_DIR}/src/platform.cpp
-    ${CMAKE_SOURCE_DIR}/src/utils.cpp
 )
 target_link_libraries(benchmark_test
     PRIVATE
         GTest::gtest_main
-        mio::mio
-        libzstd_static
-        monocypher_lib
-        micro_ecc_lib
+        logln
 )
 target_include_directories(benchmark_test PRIVATE 
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
-    ${concurrentqueue_SOURCE_DIR}
 )
 target_compile_features(benchmark_test PRIVATE cxx_std_23)
 

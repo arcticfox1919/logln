@@ -174,20 +174,22 @@ std::vector<std::string> LogDecoder::decode_buffer(
 }
 
 // ============================================================================
-// Stream Decoding - For streaming compressed files
+// Stream Decoding - For streaming compressed/encrypted files
 // ============================================================================
 
 std::expected<std::string, DecodeError> LogDecoder::decode_stream(
     std::span<const std::byte> data,
     const Options& opts) {
     
-    // For compressed/encrypted data, collect all data blocks first
-    // then decompress as a single stream
-    std::vector<std::byte> all_compressed_data;
+    // BLOCK-INDEPENDENT ENCRYPTION:
+    // - Every block stores its own client_pubkey + nonce in header
+    // - Each block is decrypted independently (counter resets per block)
+    // - This is crash-safe: no need to track counter across blocks
+    
+    std::vector<std::byte> all_decrypted_data;
     std::ostringstream plain_text;
     std::size_t offset = 0;
     bool has_compressed = false;
-    bool has_encrypted = false;
     
     while (offset < data.size()) {
         auto remaining = data.subspan(offset);
@@ -233,10 +235,43 @@ std::expected<std::string, DecodeError> LogDecoder::decode_stream(
         
         if (parsed.is_compressed || parsed.is_encrypted) {
             has_compressed = parsed.is_compressed;
-            has_encrypted = parsed.is_encrypted;
-            // Collect all compressed/encrypted data (it's a continuous stream)
-            all_compressed_data.insert(all_compressed_data.end(),
-                                      record_data.begin(), record_data.end());
+            
+            // Copy block data for processing
+            std::vector<std::byte> block_data(record_data.begin(), record_data.end());
+            
+            // Decrypt this block independently
+            if (parsed.is_encrypted && opts.encryptor) {
+                auto header_ptr = record_span.data();
+                auto pubkey = LogHeader::get_client_pubkey(header_ptr);
+                auto nonce = LogHeader::get_nonce(header_ptr);
+                
+                // Check if this block has valid pubkey
+                bool has_pubkey = false;
+                for (auto b : pubkey) {
+                    if (std::to_integer<int>(b) != 0) { has_pubkey = true; break; }
+                }
+                
+                if (has_pubkey) {
+                    // Reset counter to 0 for this block's decryption
+                    opts.encryptor->set_nonce(nonce);
+                    
+                    // Decrypt each 8-byte chunk with counter starting from 0
+                    std::size_t chunk_count = block_data.size() / 8;
+                    for (std::size_t i = 0; i < chunk_count; ++i) {
+                        auto chunk_span = std::span<std::byte>(block_data.data() + i * 8, 8);
+                        auto result = opts.encryptor->decrypt(chunk_span);
+                        if (!result) {
+                            return std::unexpected(DecodeError::DecryptFailed);
+                        }
+                        std::memcpy(chunk_span.data(), result->data(), 8);
+                    }
+                    // Note: trailing bytes (< 8) were not encrypted, leave as-is
+                }
+            }
+            
+            // Append decrypted block data
+            all_decrypted_data.insert(all_decrypted_data.end(),
+                                      block_data.begin(), block_data.end());
         } else {
             // Plain text record
             plain_text << std::string_view(
@@ -247,44 +282,20 @@ std::expected<std::string, DecodeError> LogDecoder::decode_stream(
         offset += record_size;
     }
     
-    // Step 2: Decrypt data using streaming decryption (matching xlog's streaming encryption)
-    std::vector<std::byte> decrypted_data;
-    if (has_encrypted && opts.encryptor && !all_compressed_data.empty()) {
-        // Decrypt all complete 8-byte blocks, leave remainder as-is
-        // This matches xlog's CryptAsyncLog behavior
-        std::size_t total_len = all_compressed_data.size();
-        std::size_t block_count = total_len / 8;
-        
-        decrypted_data.resize(total_len);
-        std::memcpy(decrypted_data.data(), all_compressed_data.data(), total_len);
-        
-        // Decrypt each 8-byte block in-place
-        for (std::size_t i = 0; i < block_count; ++i) {
-            auto block_span = std::span<std::byte>(decrypted_data.data() + i * 8, 8);
-            auto result = opts.encryptor->decrypt(block_span);
-            if (!result) {
-                return std::unexpected(DecodeError::DecryptFailed);
-            }
-            std::memcpy(block_span.data(), result->data(), 8);
-        }
-    } else {
-        decrypted_data = std::move(all_compressed_data);
-    }
-    
-    // Step 3: Decompress all data at once (streaming decompression)
+    // Decompress all decrypted data at once (streaming decompression)
     std::string result = plain_text.str();
-    if (has_compressed && opts.compressor && !decrypted_data.empty()) {
-        auto decompressed = opts.compressor->decompress(decrypted_data);
+    if (has_compressed && opts.compressor && !all_decrypted_data.empty()) {
+        auto decompressed = opts.compressor->decompress(all_decrypted_data);
         if (!decompressed) {
             return std::unexpected(DecodeError::DecompressFailed);
         }
         result += std::string_view(
             reinterpret_cast<const char*>(decompressed->data()),
             decompressed->size());
-    } else if (!decrypted_data.empty()) {
+    } else if (!all_decrypted_data.empty()) {
         result += std::string_view(
-            reinterpret_cast<const char*>(decrypted_data.data()),
-            decrypted_data.size());
+            reinterpret_cast<const char*>(all_decrypted_data.data()),
+            all_decrypted_data.size());
     }
     
     return result;
@@ -365,7 +376,8 @@ std::string LogDecoder::dump_with_header(const void* data, std::size_t len) {
 
 struct logln_decoder_impl {
     std::unique_ptr<logln::ZstdCompressor> compressor;
-    std::unique_ptr<logln::ChaCha20Encryptor> encryptor;
+    std::unique_ptr<logln::IEncryptor> encryptor;
+    std::string private_key_hex;  // Store private key for deferred decryptor creation
     
     logln::LogDecoder::Options get_options() const {
         return {
@@ -413,7 +425,7 @@ LOGLN_DECODER_API int logln_decoder_set_private_key(
     if (key_len != 32) return LOGLN_DECODE_INVALID_DATA;
     
     try {
-        // Convert bytes to hex string
+        // Convert bytes to hex string and store for later use
         std::string hex_key;
         hex_key.reserve(64);
         for (size_t i = 0; i < key_len; ++i) {
@@ -421,7 +433,7 @@ LOGLN_DECODER_API int logln_decoder_set_private_key(
             snprintf(buf, sizeof(buf), "%02x", private_key[i]);
             hex_key += buf;
         }
-        decoder->encryptor = std::make_unique<logln::ChaCha20Encryptor>(hex_key);
+        decoder->private_key_hex = std::move(hex_key);
         return LOGLN_DECODE_OK;
     } catch (...) {
         return LOGLN_DECODE_ALLOC_FAILED;
@@ -431,6 +443,7 @@ LOGLN_DECODER_API int logln_decoder_set_private_key(
 LOGLN_DECODER_API int logln_decoder_clear_key(logln_decoder_t decoder) {
     if (!decoder) return LOGLN_DECODE_NULL_PARAM;
     decoder->encryptor.reset();
+    decoder->private_key_hex.clear();
     return LOGLN_DECODE_OK;
 }
 
@@ -470,6 +483,30 @@ LOGLN_DECODER_API int logln_decoder_decode_file(
     if (!decoder || !file_path || !output) return LOGLN_DECODE_NULL_PARAM;
     
     try {
+        // If private key is set, read client pubkey from file and create decryptor
+        if (!decoder->private_key_hex.empty()) {
+            std::vector<std::byte> pubkey(64);
+            FILE* fp = std::fopen(file_path, "rb");
+            if (!fp) return LOGLN_DECODE_OPEN_FAILED;
+            
+            // Skip magic(1)+seq(2)+hours(2)+length(4) = 9 bytes to get to pubkey
+            std::fseek(fp, 9, SEEK_SET);
+            size_t read = std::fread(pubkey.data(), 1, 64, fp);
+            std::fclose(fp);
+            
+            if (read != 64) return LOGLN_DECODE_READ_FAILED;
+            
+            // Check if pubkey is valid (not all zeros)
+            bool has_pubkey = false;
+            for (auto b : pubkey) {
+                if (std::to_integer<int>(b) != 0) { has_pubkey = true; break; }
+            }
+            
+            if (has_pubkey) {
+                decoder->encryptor = logln::create_decryptor(pubkey, decoder->private_key_hex);
+            }
+        }
+        
         auto result = logln::LogDecoder::decode_file(file_path, decoder->get_options());
         if (!result) {
             return decode_error_to_c(result.error());
@@ -489,6 +526,30 @@ LOGLN_DECODER_API int logln_decoder_decode_mmap(
     if (!decoder || !file_path || !output) return LOGLN_DECODE_NULL_PARAM;
     
     try {
+        // If private key is set, read client pubkey from file and create decryptor
+        if (!decoder->private_key_hex.empty()) {
+            std::vector<std::byte> pubkey(64);
+            FILE* fp = std::fopen(file_path, "rb");
+            if (!fp) return LOGLN_DECODE_OPEN_FAILED;
+            
+            // Skip magic(1)+seq(2)+hours(2)+length(4) = 9 bytes to get to pubkey
+            std::fseek(fp, 9, SEEK_SET);
+            size_t read = std::fread(pubkey.data(), 1, 64, fp);
+            std::fclose(fp);
+            
+            if (read != 64) return LOGLN_DECODE_READ_FAILED;
+            
+            // Check if pubkey is valid (not all zeros)
+            bool has_pubkey = false;
+            for (auto b : pubkey) {
+                if (std::to_integer<int>(b) != 0) { has_pubkey = true; break; }
+            }
+            
+            if (has_pubkey) {
+                decoder->encryptor = logln::create_decryptor(pubkey, decoder->private_key_hex);
+            }
+        }
+        
         auto result = logln::LogDecoder::decode_mmap(file_path, decoder->get_options());
         if (!result) {
             return decode_error_to_c(result.error());

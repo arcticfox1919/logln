@@ -435,6 +435,16 @@ void LogBuffer::clear() noexcept {
     }
     view_.set_size(0);
     initialized_ = false;
+    
+    // Reset encryption state for new block
+    // BLOCK-INDEPENDENT ENCRYPTION: Each block starts with counter=0
+    // This ensures crash-safety - no need to persist counter state
+    remain_nocrypt_len_ = 0;
+    if (encryptor_ && encryptor_->is_active()) {
+        // Reset counter by re-setting the nonce
+        auto nonce = encryptor_->nonce();
+        encryptor_->set_nonce(nonce);
+    }
 }
 
 std::size_t LogBuffer::process_data(const void* src, std::size_t len,
@@ -503,7 +513,10 @@ void LogBuffer::ensure_initialized() {
         has_encryptor()
     );
     
-    // Set client public key and nonce if encryption is enabled
+    // BLOCK-INDEPENDENT ENCRYPTION:
+    // Every block stores its own pubkey and nonce for independent decryption
+    // This is crash-safe: if process dies, each block can still be decoded
+    // Counter resets to 0 at clear() for each new block
     if (encryptor_ && encryptor_->is_active()) {
         LogHeader::set_client_pubkey(view_.data(), encryptor_->public_key());
         LogHeader::set_nonce(view_.data(), encryptor_->nonce());

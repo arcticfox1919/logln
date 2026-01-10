@@ -34,7 +34,16 @@ static std::unique_ptr<ZstdCompressor> g_compressor;
 static std::string g_server_priv_key_hex;
 static std::unique_ptr<IEncryptor> g_encryptor;
 
+// Check if buffer is all zeros
+static bool is_all_zeros(const std::vector<std::byte>& data) {
+    for (auto b : data) {
+        if (std::to_integer<int>(b) != 0) return false;
+    }
+    return true;
+}
+
 // Read client public key from file header (bytes 9-72, 64 bytes)
+// Returns empty vector if not found or all zeros
 static std::vector<std::byte> read_client_pubkey(const fs::path& path) {
     std::vector<std::byte> pubkey(64);
     FILE* fp = std::fopen(path.string().c_str(), "rb");
@@ -52,10 +61,17 @@ static std::vector<std::byte> read_client_pubkey(const fs::path& path) {
     }
     
     std::fclose(fp);
+    
+    // Check if pubkey is all zeros (not encrypted or subsequent block)
+    if (is_all_zeros(pubkey)) {
+        return {};
+    }
+    
     return pubkey;
 }
 
 // Read nonce from file header (bytes 73-88, 16 bytes)
+// Returns empty vector if not found or all zeros
 static std::vector<std::byte> read_nonce(const fs::path& path) {
     std::vector<std::byte> nonce(16);
     FILE* fp = std::fopen(path.string().c_str(), "rb");
@@ -73,6 +89,12 @@ static std::vector<std::byte> read_nonce(const fs::path& path) {
     }
     
     std::fclose(fp);
+    
+    // Check if nonce is all zeros
+    if (is_all_zeros(nonce)) {
+        return {};
+    }
+    
     return nonce;
 }
 

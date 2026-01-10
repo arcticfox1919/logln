@@ -4,7 +4,7 @@ import subprocess
 import glob
 import os
 
-PRIVATE_KEY = "12a75cf111918579712b8158903c4b75ae5fb61355b85c2884ffaab5682a02c3"
+PRIVATE_KEY = "af3cd491a07442a660ac6ce5884ece8baa52e5437afa2ca7e9cb5589e0fe7e25"
 LOGLND = os.path.join(os.path.dirname(__file__), "..", "build", "tools", "Release", "loglnd.exe")
 
 for f in glob.glob("logs/*.blog") + glob.glob("logs/*.mmap"):

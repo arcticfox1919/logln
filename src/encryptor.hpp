@@ -129,6 +129,14 @@ public:
         return {};
     }
     
+    [[nodiscard]] std::span<const std::byte> nonce() const override {
+        return {};
+    }
+    
+    void set_nonce(std::span<const std::byte>) override {
+        // No-op for null encryptor
+    }
+    
     [[nodiscard]] bool is_active() const noexcept override {
         return false;
     }

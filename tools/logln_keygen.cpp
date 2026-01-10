@@ -124,14 +124,20 @@ int main(int argc, char* argv[]) {
     std::fprintf(out, "#   Decryption:  loglnd --private-key <PRIVATE_KEY> encrypted.blog\n");
     std::fprintf(out, "\n");
     std::fprintf(out, "PRIVATE_KEY=%s\n", priv_hex.c_str());
+    std::fprintf(out, "# Length: %zu chars (expected: 64)\n\n", priv_hex.size());
     std::fprintf(out, "PUBLIC_KEY=%s\n", pub_hex.c_str());
+    std::fprintf(out, "# Length: %zu chars (expected: 128)\n", pub_hex.size());
     
     // Also print to stderr if writing to file (so user sees the output)
     if (out_path) {
         std::fclose(out);
         std::fprintf(stderr, "Key pair saved to: %s\n\n", out_path);
-        std::fprintf(stderr, "Public Key (for app config):\n%s\n\n", pub_hex.c_str());
-        std::fprintf(stderr, "Private Key (KEEP SECRET, for decryption):\n%s\n", priv_hex.c_str());
+        std::fprintf(stderr, "Public Key (for app config):\n");
+        std::fprintf(stderr, "  %s\n", pub_hex.c_str());
+        std::fprintf(stderr, "  [Length: %zu chars, expected: 128]\n\n", pub_hex.size());
+        std::fprintf(stderr, "Private Key (KEEP SECRET, for decryption):\n");
+        std::fprintf(stderr, "  %s\n", priv_hex.c_str());
+        std::fprintf(stderr, "  [Length: %zu chars, expected: 64]\n", priv_hex.size());
     }
     
     // Secure wipe private key from memory
